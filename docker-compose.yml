@@ -9,7 +9,7 @@ services:
       ORACLE_PASSWORD: oracle123
       ORACLE_DATABASE: PRINCIPAL
     ports:
-      - "1521:1521"
+      - "1524:1521"
     volumes:
       - site_principal_data:/opt/oracle/oradata
     networks:

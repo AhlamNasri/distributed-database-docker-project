@@ -1,1 +1,125 @@
+# ============================================================
+# Docker Compose — Distributed Database EShop
+# Architecture : 3 conteneurs Oracle XE
+#   - oracle-site1  : Site Principal (BDDVENTE)   → port 1521
+#   - oracle-site2  : Site Distant 2              → port 1522
+#   - oracle-central: Site Central (coordination) → port 1523
+# Réseau : eshop-network (bridge, sous-réseau 172.20.0.0/16)
+# ============================================================
 
+version: '3.8'
+
+networks:
+  eshop-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+services:
+
+  # -------------------------------------------------------
+  # SITE 1 — Site Principal (QUANTITE >= 100)
+  # -------------------------------------------------------
+  oracle-site1:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: oracle-site1
+    hostname: oracle-site1
+    environment:
+      ORACLE_PASSWORD: oracle1
+      ORACLE_DATABASE: BDDVENTE
+      APP_USER: eshop1
+      APP_USER_PASSWORD: eshop1pass
+    ports:
+      - "1521:1521"
+    volumes:
+      - site1-data:/opt/oracle/oradata
+      - ./site1/scenario2/fragments:/docker-entrypoint-initdb.d/fragments:ro
+      - ./site1/scenario2/procedures:/docker-entrypoint-initdb.d/procedures:ro
+      - ./site1/scenario2/triggers:/docker-entrypoint-initdb.d/triggers:ro
+      - ./site1/scenario2/indexes:/docker-entrypoint-initdb.d/indexes:ro
+      - ./schema:/docker-entrypoint-initdb.d/schema:ro
+    networks:
+      eshop-network:
+        ipv4_address: 172.20.0.10
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
+  # -------------------------------------------------------
+  # SITE 2 — Site Distant (QUANTITE < 100)
+  # -------------------------------------------------------
+  oracle-site2:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: oracle-site2
+    hostname: oracle-site2
+    environment:
+      ORACLE_PASSWORD: oracle2
+      ORACLE_DATABASE: BDDVENTE2
+      APP_USER: eshop2
+      APP_USER_PASSWORD: eshop2pass
+    ports:
+      - "1522:1521"
+    volumes:
+      - site2-data:/opt/oracle/oradata
+      - ./site2/scenario2/fragments:/docker-entrypoint-initdb.d/fragments:ro
+      - ./site2/scenario2/procedures:/docker-entrypoint-initdb.d/procedures:ro
+      - ./site2/scenario2/triggers:/docker-entrypoint-initdb.d/triggers:ro
+      - ./site2/scenario2/indexes:/docker-entrypoint-initdb.d/indexes:ro
+      - ./schema:/docker-entrypoint-initdb.d/schema:ro
+    networks:
+      eshop-network:
+        ipv4_address: 172.20.0.11
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
+  # -------------------------------------------------------
+  # SITE CENTRAL — Coordination et Database Links
+  # -------------------------------------------------------
+  oracle-central:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: oracle-central
+    hostname: oracle-central
+    environment:
+      ORACLE_PASSWORD: oraclecentral
+      ORACLE_DATABASE: BDDCENTRAL
+      APP_USER: eshopcentral
+      APP_USER_PASSWORD: centralpass
+    ports:
+      - "1523:1521"
+    volumes:
+      - central-data:/opt/oracle/oradata
+      - ./schema:/docker-entrypoint-initdb.d/schema:ro
+      - ./docker/dblinks:/docker-entrypoint-initdb.d/dblinks:ro
+    networks:
+      eshop-network:
+        ipv4_address: 172.20.0.12
+    depends_on:
+      oracle-site1:
+        condition: service_healthy
+      oracle-site2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+    restart: unless-stopped
+
+volumes:
+  site1-data:
+    driver: local
+  site2-data:
+    driver: local
+  central-data:
+    driver: local

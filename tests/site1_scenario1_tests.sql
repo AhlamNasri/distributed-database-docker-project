@@ -72,9 +72,9 @@ DBMS_OUTPUT.PUT_LINE('=== Données de base insérées ===');
 -- -------------------------------------------------------
 DBMS_OUTPUT.PUT_LINE('--- Test INSERT valides ---');
 BEGIN
-    insertligne_sc1(201, 1, 10, 5, 0);    -- OK : produit 10 est catégorie 50
-    insertligne_sc1(202, 1, 11, 2, 5);    -- OK : produit 11 est catégorie 50
-    insertligne_sc1(203, 2, 10, 1, 10);   -- OK : produit 10 catégorie 50, commande 2
+insertligne_sc1(201, 1, 10, 150, 0);
+insertligne_sc1(202, 1, 11, 200, 5);
+insertligne_sc1(203, 2, 10, 120, 10);
 END;
 /
 
@@ -125,7 +125,7 @@ END;
 -- -------------------------------------------------------
 DBMS_OUTPUT.PUT_LINE('--- Test UPDATE valide ---');
 BEGIN
-    updateligne_sc1(201, 11, 10, 15);  -- Changer produit à 11, qte à 10, remise à 15
+    updateligne_sc1(201, 11, 150, 15);
 END;
 /
 

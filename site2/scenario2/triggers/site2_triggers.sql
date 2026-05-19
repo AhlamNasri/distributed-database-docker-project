@@ -1,0 +1,66 @@
+-- ============================================================
+-- SITE 2 - TRIGGERS (Scenario 2)
+-- Règle fragment : QUANTITE < 100
+-- ============================================================
+
+-- Table de log
+CREATE TABLE LOG_SITE2 (
+    ID_LOG          NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    OPERATION       VARCHAR2(10),
+    IDLIGNECOMMANDE NUMBER,
+    QUANTITE_OLD    NUMBER,
+    QUANTITE_NEW    NUMBER,
+    DATE_OPERATION  TIMESTAMP DEFAULT SYSTIMESTAMP,
+    UTILISATEUR     VARCHAR2(100) DEFAULT USER
+);
+
+-- Trigger BEFORE INSERT
+CREATE OR REPLACE TRIGGER trg_check_site2_insert
+BEFORE INSERT ON LigneCommandes2
+FOR EACH ROW
+BEGIN
+    IF :NEW.QUANTITE >= 100 THEN
+        RAISE_APPLICATION_ERROR(-20010,
+            'TRIGGER SITE2 - INSERT bloqué : QUANTITE=' || :NEW.QUANTITE ||
+            ' >= 100. Cette ligne appartient à Site1.');
+    END IF;
+END;
+/
+
+-- Trigger BEFORE UPDATE
+CREATE OR REPLACE TRIGGER trg_check_site2_update
+BEFORE UPDATE ON LigneCommandes2
+FOR EACH ROW
+BEGIN
+    IF :NEW.QUANTITE >= 100 THEN
+        RAISE_APPLICATION_ERROR(-20011,
+            'TRIGGER SITE2 - UPDATE bloqué : Nouvelle QUANTITE=' || :NEW.QUANTITE ||
+            ' >= 100. Modifier sur Site1 à la place.');
+    END IF;
+END;
+/
+
+-- Trigger LOG
+CREATE OR REPLACE TRIGGER trg_log_site2_operations
+AFTER INSERT OR UPDATE OR DELETE ON LigneCommandes2
+FOR EACH ROW
+DECLARE
+    v_operation VARCHAR2(10);
+BEGIN
+    IF INSERTING THEN
+        v_operation := 'INSERT';
+        INSERT INTO LOG_SITE2 (OPERATION, IDLIGNECOMMANDE, QUANTITE_OLD, QUANTITE_NEW)
+        VALUES (v_operation, :NEW.IDLIGNECOMMANDE, NULL, :NEW.QUANTITE);
+    ELSIF UPDATING THEN
+        v_operation := 'UPDATE';
+        INSERT INTO LOG_SITE2 (OPERATION, IDLIGNECOMMANDE, QUANTITE_OLD, QUANTITE_NEW)
+        VALUES (v_operation, :NEW.IDLIGNECOMMANDE, :OLD.QUANTITE, :NEW.QUANTITE);
+    ELSIF DELETING THEN
+        v_operation := 'DELETE';
+        INSERT INTO LOG_SITE2 (OPERATION, IDLIGNECOMMANDE, QUANTITE_OLD, QUANTITE_NEW)
+        VALUES (v_operation, :OLD.IDLIGNECOMMANDE, :OLD.QUANTITE, NULL);
+    END IF;
+END;
+/
+
+COMMIT;

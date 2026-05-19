@@ -99,7 +99,7 @@ services:
     volumes:
       - central-data:/opt/oracle/oradata
       - ./schema:/docker-entrypoint-initdb.d/schema:ro
-      - ./docker/dblinks:/docker-entrypoint-initdb.d/dblinks:ro
+      - ./docker/setup_dblinks.sql:/docker-entrypoint-initdb.d/setup_dblinks.sql:ro
     networks:
       eshop-network:
         ipv4_address: 172.20.0.12

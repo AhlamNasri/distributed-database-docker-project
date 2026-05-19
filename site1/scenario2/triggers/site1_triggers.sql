@@ -46,7 +46,7 @@ END;
 -- -------------------------------------------------------
 
 -- Table de log (à créer avant le trigger)
-CREATE TABLE IF NOT EXISTS LOG_SITE1 (
+CREATE TABLE LOG_SITE1 (
     ID_LOG          NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     OPERATION       VARCHAR2(10),
     IDLIGNECOMMANDE NUMBER,

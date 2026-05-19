@@ -1,6 +1,6 @@
 -- ============================================================
 -- SITE 1 - TRIGGERS (Scenario 1)
--- Règle fragment : IDCATEG = 50
+-- Règle fragment : IDCATEG = 50 AND QUANTITE > 100
 -- Table principale : LigneCommandes1_sc1
 -- ============================================================
 
@@ -20,6 +20,7 @@ CREATE TABLE LOG_SITE1_SC1 (
 -- -------------------------------------------------------
 -- 1. trg_check_sc1_insert
 --    BEFORE INSERT : vérifie que le produit est de catégorie 50
+--                    ET que la quantité est > 100
 -- -------------------------------------------------------
 CREATE OR REPLACE TRIGGER trg_check_sc1_insert
 BEFORE INSERT ON LigneCommandes1_sc1
@@ -27,6 +28,14 @@ FOR EACH ROW
 DECLARE
     v_categ NUMBER;
 BEGIN
+    -- Vérification règle de fragmentation : quantité
+    IF :NEW.QUANTITE <= 100 THEN
+        RAISE_APPLICATION_ERROR(-20014,
+            'TRIGGER SITE1 SC1 - INSERT bloqué : QUANTITE=' || :NEW.QUANTITE ||
+            ' doit être > 100 pour Site1 scénario 1.');
+    END IF;
+
+    -- Vérification règle de fragmentation : catégorie
     SELECT IDCATEG INTO v_categ
     FROM Produits1_sc1
     WHERE IDPRODUIT = :NEW.IDPRODUIT;
@@ -46,6 +55,7 @@ END;
 -- -------------------------------------------------------
 -- 2. trg_check_sc1_update
 --    BEFORE UPDATE : vérifie que le nouveau produit est de catégorie 50
+--                    ET que la nouvelle quantité est > 100
 -- -------------------------------------------------------
 CREATE OR REPLACE TRIGGER trg_check_sc1_update
 BEFORE UPDATE ON LigneCommandes1_sc1
@@ -53,6 +63,14 @@ FOR EACH ROW
 DECLARE
     v_categ NUMBER;
 BEGIN
+    -- Vérification règle de fragmentation : quantité
+    IF :NEW.QUANTITE <= 100 THEN
+        RAISE_APPLICATION_ERROR(-20015,
+            'TRIGGER SITE1 SC1 - UPDATE bloqué : QUANTITE=' || :NEW.QUANTITE ||
+            ' doit être > 100 pour Site1 scénario 1.');
+    END IF;
+
+    -- Vérification règle de fragmentation : catégorie
     SELECT IDCATEG INTO v_categ
     FROM Produits1_sc1
     WHERE IDPRODUIT = :NEW.IDPRODUIT;

@@ -24,7 +24,7 @@ COMMIT;
 -- -------------------------------------------------------
 
 -- Categories1_sc1 : critère de fragmentation IDCATEG = 50
-INSERT INTO Categories1_sc1 (IDCATEG, NOMCATEG)
+INSERT INTO Categories1_sc1 (IDCATEG, NOMDECATEGORIE)
 VALUES (50, 'Informatique');
 
 -- Produits1_sc1 : (IDPRODUIT, DESIGNATION, IDFOUR, IDCATEG, PRIXUNITAIRE,

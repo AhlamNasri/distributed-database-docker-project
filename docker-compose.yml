@@ -1,0 +1,173 @@
+# ============================================================
+# Docker Compose — Distributed Database EShop
+# Architecture : 3 conteneurs Oracle XE
+#   - oracle-site1  : Site Principal (BDDVENTE)   → port 1521
+#   - oracle-site2  : Site Distant 2 (BDDVENTE2)  → port 1522
+#   - oracle-central: Site Central (BDDCENTRAL)   → port 1523
+# Réseau : eshop-network (bridge, sous-réseau 172.20.0.0/16)
+#
+# ORDRE D'INIT par répertoire (tri alphabétique garantit l'ordre) :
+#   01_schema   → CREATE TABLE (tables globales)
+#   02_data     → INSERT données initiales
+#   03_grants   → GRANT privilèges à APP_USER (via SYS)
+#   04_dblinks  → CREATE DATABASE LINK (nécessite grant préalable)
+#   05_fragments→ CREATE TABLE AS SELECT (nécessite données)
+#   06_procedures → CREATE PROCEDURE
+#   07_triggers → CREATE TRIGGER
+#   08_indexes  → CREATE INDEX
+#   09_synonyms → CREATE SYNONYM
+# ============================================================
+
+version: '3.8'
+
+networks:
+  eshop-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+services:
+
+  # -------------------------------------------------------
+  # SITE 1 — Site Principal (QUANTITE >= 100)
+  # -------------------------------------------------------
+  oracle-site1:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: oracle-site1
+    hostname: oracle-site1
+    environment:
+      ORACLE_PASSWORD: oracle1
+      ORACLE_DATABASE: BDDVENTE
+      APP_USER: eshop1
+      APP_USER_PASSWORD: eshop1pass
+    ports:
+      - "1521:1521"
+    volumes:
+      - site1-data:/opt/oracle/oradata
+      # Ordre 01 : schéma global
+      - ./schema:/docker-entrypoint-initdb.d/01_schema:ro
+      # Ordre 02 : données initiales
+      - ./data:/docker-entrypoint-initdb.d/02_data:ro
+      # Ordre 03 : grants SYSTEM → APP_USER
+      - ./docker/grants.sh:/docker-entrypoint-initdb.d/03_grants.sh:ro
+      # Ordre 04 : database links sortants
+      - ./site1/dblinks:/docker-entrypoint-initdb.d/04_dblinks:ro
+      # Ordre 05 : fragments (Scénario 2 — QUANTITE >= 100)
+      - ./site1/scenario2/fragments:/docker-entrypoint-initdb.d/05_fragments:ro
+      # Ordre 06 : procédures stockées
+      - ./site1/scenario2/procedures:/docker-entrypoint-initdb.d/06_procedures:ro
+      # Ordre 07 : triggers
+      - ./site1/scenario2/triggers:/docker-entrypoint-initdb.d/07_triggers:ro
+      # Ordre 08 : index
+      - ./site1/scenario2/indexes:/docker-entrypoint-initdb.d/08_indexes:ro
+      # Ordre 09 : synonymes
+      - ./site1/scenario2/synonyms:/docker-entrypoint-initdb.d/09_synonyms:ro
+    networks:
+      eshop-network:
+        ipv4_address: 172.20.0.10
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
+  # -------------------------------------------------------
+  # SITE 2 — Site Distant (QUANTITE < 100)
+  # -------------------------------------------------------
+  oracle-site2:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: oracle-site2
+    hostname: oracle-site2
+    environment:
+      ORACLE_PASSWORD: oracle2
+      ORACLE_DATABASE: BDDVENTE2
+      APP_USER: eshop2
+      APP_USER_PASSWORD: eshop2pass
+    ports:
+      - "1522:1521"
+    volumes:
+      - site2-data:/opt/oracle/oradata
+      # Ordre 01 : schéma global
+      - ./schema:/docker-entrypoint-initdb.d/01_schema:ro
+      # Ordre 02 : données initiales
+      - ./data:/docker-entrypoint-initdb.d/02_data:ro
+      # Ordre 03 : grants SYSTEM → APP_USER
+      - ./docker/grants.sh:/docker-entrypoint-initdb.d/03_grants.sh:ro
+      # Ordre 04 : database links sortants
+      - ./site2/dblinks:/docker-entrypoint-initdb.d/04_dblinks:ro
+      # Ordre 05 : fragments (Scénario 2 — QUANTITE < 100)
+      - ./site2/scenario2/fragments:/docker-entrypoint-initdb.d/05_fragments:ro
+      # Ordre 06 : procédures stockées
+      - ./site2/scenario2/procedures:/docker-entrypoint-initdb.d/06_procedures:ro
+      # Ordre 07 : triggers
+      - ./site2/scenario2/triggers:/docker-entrypoint-initdb.d/07_triggers:ro
+      # Ordre 08 : index
+      - ./site2/scenario2/indexes:/docker-entrypoint-initdb.d/08_indexes:ro
+      # Ordre 09 : synonymes
+      - ./site2/scenario2/synonyms:/docker-entrypoint-initdb.d/09_synonyms:ro
+    networks:
+      eshop-network:
+        ipv4_address: 172.20.0.11
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
+  # -------------------------------------------------------
+  # SITE CENTRAL — Coordination et Database Links
+  # Démarre APRÈS que site1 et site2 soient healthy
+  # -------------------------------------------------------
+  oracle-central:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: oracle-central
+    hostname: oracle-central
+    environment:
+      ORACLE_PASSWORD: oraclecentral
+      ORACLE_DATABASE: BDDCENTRAL
+      APP_USER: eshopcentral
+      APP_USER_PASSWORD: centralpass
+    ports:
+      - "1523:1521"
+    volumes:
+      - central-data:/opt/oracle/oradata
+      # Ordre 01 : schéma global (tables de référence sur central)
+      - ./schema:/docker-entrypoint-initdb.d/01_schema:ro
+      # Ordre 02 : données initiales (pour les tables globales locales)
+      - ./data:/docker-entrypoint-initdb.d/02_data:ro
+      # Ordre 03 : grants SYSTEM → eshopcentral
+      - ./docker/grants.sh:/docker-entrypoint-initdb.d/03_grants.sh:ro
+      # Ordre 04 : database links Central → Site1, Central → Site2
+      - ./docker/setup_dblinks.sh:/docker-entrypoint-initdb.d/04_setup_dblinks.sh:ro
+      # Ordre 05 : synonymes (accès transparent sans @link)
+      - ./docker/synonyms_central.sh:/docker-entrypoint-initdb.d/05_synonyms_central.sh:ro
+      # Ordre 06 : routage automatique Central -> bon site via DB links
+      - ./docker/routing_central.sh:/docker-entrypoint-initdb.d/06_routing_central.sh:ro
+    depends_on:
+      oracle-site1:
+        condition: service_healthy
+      oracle-site2:
+        condition: service_healthy
+    networks:
+      eshop-network:
+        ipv4_address: 172.20.0.12
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+    restart: unless-stopped
+
+volumes:
+  site1-data:
+    driver: local
+  site2-data:
+    driver: local
+  central-data:
+    driver: local

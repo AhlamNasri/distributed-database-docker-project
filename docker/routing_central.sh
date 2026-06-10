@@ -294,48 +294,12 @@ END;
 /
 
 CREATE OR REPLACE TRIGGER trg_route_lignecommandes_table
-AFTER INSERT OR UPDATE OR DELETE ON LIGNECOMMANDES
+BEFORE INSERT OR UPDATE OR DELETE ON LIGNECOMMANDES
 FOR EACH ROW
-DECLARE
-    v_use_sc1 NUMBER;
 BEGIN
-    SELECT COUNT(*) INTO v_use_sc1
-    FROM USER_OBJECTS
-    WHERE OBJECT_NAME = 'V_LIGNECOMMANDES_ROUTAGE_SC1'
-      AND OBJECT_TYPE = 'VIEW'
-      AND STATUS = 'VALID';
-
-    IF INSERTING THEN
-        IF v_use_sc1 > 0 THEN
-            EXECUTE IMMEDIATE
-                'BEGIN route_insert_ligne_sc1(:1, :2, :3, :4, :5); END;'
-                USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
-        ELSE
-            EXECUTE IMMEDIATE
-                'BEGIN route_insert_ligne(:1, :2, :3, :4, :5); END;'
-                USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
-        END IF;
-    ELSIF UPDATING THEN
-        IF v_use_sc1 > 0 THEN
-            EXECUTE IMMEDIATE
-                'BEGIN route_upsert_ligne_sc1(:1, :2, :3, :4, :5); END;'
-                USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
-        ELSE
-            EXECUTE IMMEDIATE
-                'BEGIN route_upsert_ligne(:1, :2, :3, :4, :5); END;'
-                USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
-        END IF;
-    ELSIF DELETING THEN
-        IF v_use_sc1 > 0 THEN
-            EXECUTE IMMEDIATE
-                'BEGIN route_delete_ligne_sc1(:1); END;'
-                USING :OLD.IDLIGNECOMMANDE;
-        ELSE
-            EXECUTE IMMEDIATE
-                'BEGIN route_delete_ligne(:1); END;'
-                USING :OLD.IDLIGNECOMMANDE;
-        END IF;
-    END IF;
+    RAISE_APPLICATION_ERROR(-20300,
+        'DML direct sur LIGNECOMMANDES interdit. '
+        || 'Utilisez la vue V_LIGNECOMMANDES_ROUTAGE a la place.');
 END;
 /
 
@@ -558,6 +522,10 @@ END;]';
     END IF;
 END;
 /
+
+-- Suppression des 25 lignes redondantes sur le Central
+-- Le routage via V_LIGNECOMMANDES_ROUTAGE est desormais le seul point d'entree
+TRUNCATE TABLE LIGNECOMMANDES;
 
 COMMIT;
 EXIT;

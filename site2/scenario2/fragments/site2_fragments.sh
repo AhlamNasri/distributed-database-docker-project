@@ -48,6 +48,9 @@ ALTER TABLE LigneCommandes2 ADD CONSTRAINT fk_lc2_prod
 ALTER TABLE LigneCommandes2 ADD CONSTRAINT chk_sc2_site2_qte
     CHECK (QUANTITE < 100);
 
+-- Suppression des 25 lignes redondantes : le fragment LigneCommandes2 prend le relais
+TRUNCATE TABLE LIGNECOMMANDES;
+
 COMMIT;
 EXIT;
 SQLEOF

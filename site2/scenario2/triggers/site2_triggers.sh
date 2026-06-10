@@ -64,6 +64,18 @@ BEGIN
 END;
 /
 
+-- Bloquer tout DML direct sur LIGNECOMMANDES (table globale vide sur ce site)
+-- Les inserts doivent passer par V_LIGNECOMMANDES_ROUTAGE sur le Central
+CREATE OR REPLACE TRIGGER trg_block_lignecommandes_site2
+BEFORE INSERT OR UPDATE OR DELETE ON LIGNECOMMANDES
+FOR EACH ROW
+BEGIN
+    RAISE_APPLICATION_ERROR(-20302,
+        'DML direct sur LIGNECOMMANDES interdit sur Site2. '
+        || 'Utilisez la vue V_LIGNECOMMANDES_ROUTAGE sur le Central.');
+END;
+/
+
 COMMIT;
 EXIT;
 SQLEOF

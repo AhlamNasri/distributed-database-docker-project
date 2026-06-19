@@ -34,7 +34,7 @@ bidirectionnels entre trois nœuds Oracle XE.
 
 | Scénario | Site 1 | Site 2 |
 |----------|--------|--------|
-| **Sc1** — par catégorie | `IDCATEG = 50` (Informatique) | `IDCATEG = 35` (Accessoires) |
+| **Sc1** — par catégorie | `IDCATEG = 50` (Informatique) AND `QUANTITE > 100`  | `IDCATEG = 35` (Accessoires) AND `QUANTITE > 50`   |
 | **Sc2** — par volume   | `QUANTITE >= 100` (Grossistes) | `QUANTITE < 100` (Détaillants) |
 
 **Docker Compose déploie le Scénario 2** (volumes montés vers `scenario2/`).

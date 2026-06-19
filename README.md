@@ -38,7 +38,97 @@ bidirectionnels entre trois nœuds Oracle XE.
 | **Sc2** — par volume   | `QUANTITE >= 100` (Grossistes) | `QUANTITE < 100` (Détaillants) |
 
 **Docker Compose déploie le Scénario 2** (volumes montés vers `scenario2/`).
-Pour Scénario 1, modifier les chemins dans `docker-compose.yml`.
+Pour Scénario 1, suivre la section suivante afin de modifier les chemins dans
+`docker-compose.yml`.
+
+## Choisir et deployer un scenario
+
+Le projet contient deux scenarios complets, mais un seul est charge au demarrage
+par Docker Compose. Le choix se fait avec les chemins montes dans
+`docker-compose.yml`.
+
+### Scenario 2 - par quantite (configuration par defaut)
+
+Ce scenario est deja configure dans `docker-compose.yml`.
+
+- `oracle-site1` charge les scripts de `site1/scenario2/`.
+- `oracle-site2` charge les scripts de `site2/scenario2/`.
+- Le central expose la vue `V_LIGNECOMMANDES_ROUTAGE`.
+- Les lignes avec `QUANTITE >= 100` vont vers Site 1.
+- Les lignes avec `QUANTITE < 100` vont vers Site 2.
+
+Pour demarrer proprement ce scenario :
+
+```bash
+docker-compose down -v
+bash scripts/start.sh
+bash scripts/connectivity_test.sh
+```
+
+Depuis PowerShell, utiliser :
+
+```powershell
+docker-compose down -v
+docker-compose up -d
+docker-compose ps
+```
+
+### Scenario 1 - par categorie
+
+Pour deployer le Scenario 1, remplacer les montages `scenario2` par
+`scenario1` dans `docker-compose.yml`, uniquement pour `oracle-site1` et
+`oracle-site2`.
+
+Pour `oracle-site1`, remplacer :
+
+```yaml
+- ./site1/scenario2/fragments:/docker-entrypoint-initdb.d/05_fragments:ro
+- ./site1/scenario2/procedures:/docker-entrypoint-initdb.d/06_procedures:ro
+- ./site1/scenario2/triggers:/docker-entrypoint-initdb.d/07_triggers:ro
+- ./site1/scenario2/indexes:/docker-entrypoint-initdb.d/08_indexes:ro
+- ./site1/scenario2/synonyms:/docker-entrypoint-initdb.d/09_synonyms:ro
+```
+
+par :
+
+```yaml
+- ./site1/scenario1/fragments:/docker-entrypoint-initdb.d/05_fragments:ro
+- ./site1/scenario1/procedures:/docker-entrypoint-initdb.d/06_procedures:ro
+- ./site1/scenario1/triggers:/docker-entrypoint-initdb.d/07_triggers:ro
+- ./site1/scenario1/indexes:/docker-entrypoint-initdb.d/08_indexes:ro
+- ./site1/scenario1/synonyms:/docker-entrypoint-initdb.d/09_synonyms:ro
+```
+
+Pour `oracle-site2`, remplacer :
+
+```yaml
+- ./site2/scenario2/fragments:/docker-entrypoint-initdb.d/05_fragments:ro
+- ./site2/scenario2/procedures:/docker-entrypoint-initdb.d/06_procedures:ro
+- ./site2/scenario2/triggers:/docker-entrypoint-initdb.d/07_triggers:ro
+- ./site2/scenario2/indexes:/docker-entrypoint-initdb.d/08_indexes:ro
+- ./site2/scenario2/synonyms:/docker-entrypoint-initdb.d/09_synonyms:ro
+```
+
+par :
+
+```yaml
+- ./site2/scenario1/fragments:/docker-entrypoint-initdb.d/05_fragments:ro
+- ./site2/scenario1/procedures:/docker-entrypoint-initdb.d/06_procedures:ro
+- ./site2/scenario1/triggers:/docker-entrypoint-initdb.d/07_triggers:ro
+- ./site2/scenario1/indexes:/docker-entrypoint-initdb.d/08_indexes:ro
+- ./site2/scenario1/synonyms:/docker-entrypoint-initdb.d/09_synonyms:ro
+```
+
+Ensuite, supprimer les anciens volumes et redemarrer pour forcer Oracle a
+relancer tous les scripts d'initialisation :
+
+```bash
+docker-compose down -v
+bash scripts/start.sh
+```
+
+Le Scenario 1 est correctement actif si les tables `_sc1` existent sur les deux
+sites et si la vue centrale `V_LIGNECOMMANDES_ROUTAGE_SC1` est disponible.
 
 ## Prérequis
 
@@ -145,20 +235,46 @@ sqlplus eshopcentral/centralpass@//localhost:1523/BDDCENTRAL
 ## Exécution des tests
 
 ```bash
-# Tests CRUD complets — Site1 Scénario 2
+# Tests CRUD complets - Site1 Scenario 2
+docker cp tests/site1_scenario2_tests.sql oracle-site1:/tmp/site1_scenario2_tests.sql
 docker exec oracle-site1 sqlplus eshop1/eshop1pass@//localhost:1521/BDDVENTE \
-    @/docker-entrypoint-initdb.d/site1_scenario2_tests.sql
+    @/tmp/site1_scenario2_tests.sql
 
-# Tests de connectivité réseau
+# Tests CRUD complets - Site2 Scenario 2
+docker cp tests/site2_scenario2_tests.sql oracle-site2:/tmp/site2_scenario2_tests.sql
+docker exec oracle-site2 sqlplus eshop2/eshop2pass@//localhost:1521/BDDVENTE2 \
+    @/tmp/site2_scenario2_tests.sql
+
+# Tests CRUD complets - Site1 Scenario 1
+# A lancer seulement apres avoir deploye scenario1 dans docker-compose.yml.
+docker cp tests/site1_scenario1_tests.sql oracle-site1:/tmp/site1_scenario1_tests.sql
+docker exec oracle-site1 sqlplus eshop1/eshop1pass@//localhost:1521/BDDVENTE \
+    @/tmp/site1_scenario1_tests.sql
+
+# Tests CRUD complets - Site2 Scenario 1
+# A lancer seulement apres avoir deploye scenario1 dans docker-compose.yml.
+docker cp tests/site2_scenario1_tests.sql oracle-site2:/tmp/site2_scenario1_tests.sql
+docker exec oracle-site2 sqlplus eshop2/eshop2pass@//localhost:1521/BDDVENTE2 \
+    @/tmp/site2_scenario1_tests.sql
+
+# Tests de connectivite reseau
 bash scripts/connectivity_test.sh
 
-# Surveillance des DB Links (depuis oracle-central)
+# Surveillance des DB Links depuis oracle-central
+docker cp monitoring/check_dblinks.sql oracle-central:/tmp/check_dblinks.sql
 docker exec oracle-central sqlplus eshopcentral/centralpass@//localhost:1521/BDDCENTRAL \
-    @/path/to/monitoring/check_dblinks.sql
+    @/tmp/check_dblinks.sql
 
 # Health check complet
 bash monitoring/check_health.sh
 ```
+
+Resultats attendus apres initialisation :
+
+| Scenario actif | Site 1 | Site 2 | Vue centrale |
+|----------------|--------|--------|--------------|
+| Scenario 2 | `LigneCommandes1` contient 12 lignes | `LigneCommandes2` contient 13 lignes | `V_LIGNECOMMANDES_ROUTAGE` |
+| Scenario 1 | `LigneCommandes1_sc1` contient 10 lignes | `LigneCommandes2_sc1` contient 10 lignes | `V_LIGNECOMMANDES_ROUTAGE_SC1` |
 
 ## Ordre d'initialisation des scripts (critique)
 
@@ -195,9 +311,11 @@ l'ordre correct :
 ## Routage automatique depuis le central
 
 Le central expose des vues ecrivables qui redirigent les insertions,
-modifications et suppressions vers le bon site via les DB links. Les ecritures
-directes dans la table centrale `LIGNECOMMANDES` sont aussi interceptees par un
-trigger et routees vers le fragment distant correspondant.
+modifications et suppressions vers le bon site via les DB links.
+
+Important : les ecritures directes dans la table centrale `LIGNECOMMANDES` sont
+interdites par le trigger `trg_route_lignecommandes_table`. Le point d'entree
+correct pour les operations distribuees est la vue centrale du scenario actif.
 
 Scenario 2, deploye par defaut dans `docker-compose.yml` :
 
@@ -239,13 +357,28 @@ docker exec oracle-central sqlplus eshopcentral/centralpass@//localhost:1521/BDD
     @/tmp/central_routing_tests.sql
 ```
 
-Test des ecritures directes dans la table centrale :
+Controle du blocage des ecritures directes dans la table centrale :
 
 ```bash
-docker cp tests/central_direct_table_routing_tests.sql oracle-central:/tmp/central_direct_table_routing_tests.sql
-docker exec oracle-central sqlplus eshopcentral/centralpass@//localhost:1521/BDDCENTRAL \
-    @/tmp/central_direct_table_routing_tests.sql
+docker exec oracle-central sqlplus eshopcentral/centralpass@//localhost:1521/BDDCENTRAL
 ```
+
+Puis executer :
+
+```sql
+INSERT INTO LIGNECOMMANDES
+    (IDLIGNECOMMANDE, IDCOMMANDE, IDPRODUIT, QUANTITE, REMISE)
+VALUES
+    (9102, 1, 1, 150, 0);
+```
+
+Le resultat attendu est une erreur `ORA-20300` indiquant que le DML direct sur
+`LIGNECOMMANDES` est interdit et qu'il faut utiliser
+`V_LIGNECOMMANDES_ROUTAGE`.
+
+Le fichier `tests/central_direct_table_routing_tests.sql` est a traiter comme
+un ancien test experimental : il ne correspond plus au comportement courant du
+trigger central.
 
 Test Scenario 1 apres deploiement des fragments `scenario1/` :
 

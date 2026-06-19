@@ -170,49 +170,87 @@ bash scripts/connectivity_test.sh
 
 ```
 .
-├── docker-compose.yml              ← Configuration des 3 services
-├── schema/
-│   └── eshop_global.sql            ← DDL : CREATE TABLE + contraintes
-├── data/
-│   └── eshop_data.sql              ← DML : INSERT données initiales (25 LC)
-├── docker/
-│   ├── grants.sh                   ← GRANT privilèges SYS → APP_USER
-│   ├── setup_dblinks.sql           ← DB Links Central → Site1/Site2
-│   └── synonyms_central.sql        ← Synonymes pour accès transparent
-├── site1/
-│   ├── dblinks/site1_dblinks.sql   ← DB Links Site1 → Site2 + Central
-│   ├── scenario1/
-│   │   ├── fragments/              ← Fragmentation par IDCATEG=50
-│   │   ├── procedures/             ← INSERT/UPDATE/DELETE avec règles
-│   │   ├── triggers/               ← Contrôle catégorie + log
-│   │   ├── indexes/                ← Index catégorie/jointure
-│   │   └── synonyms/               ← Synonymes distants (Site2)
-│   └── scenario2/
-│       ├── fragments/              ← Fragmentation QUANTITE>=100
-│       ├── procedures/             ← INSERT/UPDATE/DELETE avec règles
-│       ├── triggers/               ← Contrôle quantité + log
-│       ├── indexes/                ← Index quantité/jointure/composite
-│       └── synonyms/               ← Synonymes distants (Site2)
-├── site2/                          ← Structure miroir de site1
-├── tests/
-│   ├── site1_scenario1_tests.sql   ← Tests CRUD + triggers Site1 Sc1
-│   ├── site1_scenario2_tests.sql   ← Tests CRUD + triggers Site1 Sc2
-│   ├── site2_scenario1_tests.sql   ← Tests CRUD + triggers Site2 Sc1
-│   ├── site2_scenario2_tests.sql   ← Tests CRUD + triggers Site2 Sc2
-│   ├── distributed_queries.sql     ← Requêtes distribuées + EXPLAIN PLAN
-│   └── performance_analysis.sql    ← Analyse comparative AVANT/APRÈS index
-├── monitoring/
-│   ├── check_dblinks.sql           ← Test connectivité DB Links
-│   ├── monitor_logs.sql            ← Surveillance tables de log
-│   └── check_health.sh             ← Health check complet du cluster
-├── maintenance/
-│   ├── purge_logs.sql              ← Purge entrées log > 30 jours
-│   ├── rebuild_indexes.sql         ← Reconstruction des index
-│   └── analyze_tables.sql          ← Collecte statistiques (DBMS_STATS)
-└── scripts/
-    ├── start.sh                    ← Démarrage ordonné du cluster
-    └── connectivity_test.sh        ← Tests ping + SQL*Plus + DB Links
+|-- docker-compose.yml               Configuration des 3 services Oracle XE
+|-- README.md                        Documentation du projet
+|-- schema/
+|   |-- eshop_global.sh              Script execute par Docker pour creer le schema
+|   `-- eshop_global.sql             Source SQL du schema global
+|-- data/
+|   |-- eshop_data.sh                Script execute par Docker pour charger les donnees
+|   `-- eshop_data.sql               Source SQL des donnees initiales
+|-- docker/
+|   |-- grants.sh                    Droits necessaires aux utilisateurs applicatifs
+|   |-- setup_dblinks.sh             Creation des DB links et vues centrales
+|   |-- setup_dblinks.sql            Source SQL des DB links centraux
+|   |-- synonyms_central.sh          Creation des synonymes sur oracle-central
+|   |-- synonyms_central.sql         Source SQL des synonymes centraux
+|   `-- routing_central.sh           Routage central via vues ecrivables
+|-- site1/
+|   |-- dblinks/
+|   |   |-- site1_dblinks.sh         DB links sortants depuis Site 1
+|   |   `-- site1_dblinks.sql        Source SQL des DB links Site 1
+|   |-- scenario1/
+|   |   |-- fragments/               Tables _sc1 pour IDCATEG = 50
+|   |   |-- procedures/              Procedures CRUD du Scenario 1
+|   |   |-- triggers/                Controle des regles Scenario 1
+|   |   |-- indexes/                 Index du Scenario 1
+|   |   `-- synonyms/                Synonymes distants du Scenario 1
+|   `-- scenario2/
+|       |-- fragments/               Tables pour QUANTITE >= 100
+|       |-- procedures/              Procedures CRUD du Scenario 2
+|       |-- triggers/                Controle des regles Scenario 2
+|       |-- indexes/                 Index du Scenario 2
+|       `-- synonyms/                Synonymes distants du Scenario 2
+|-- site2/
+|   |-- dblinks/
+|   |   |-- site2_dblinks.sh         DB links sortants depuis Site 2
+|   |   `-- site2_dblinks.sql        Source SQL des DB links Site 2
+|   |-- scenario1/
+|   |   |-- fragments/               Tables _sc1 pour IDCATEG = 35
+|   |   |-- procedures/              Procedures CRUD du Scenario 1
+|   |   |-- triggers/                Controle des regles Scenario 1
+|   |   |-- indexes/                 Index du Scenario 1
+|   |   `-- synonyms/                Synonymes distants du Scenario 1
+|   `-- scenario2/
+|       |-- fragments/               Tables pour QUANTITE < 100
+|       |-- procedures/              Procedures CRUD du Scenario 2
+|       |-- triggers/                Controle des regles Scenario 2
+|       |-- indexes/                 Index du Scenario 2
+|       `-- synonyms/                Synonymes distants du Scenario 2
+|-- tests/
+|   |-- site1_scenario1_tests.sql    Tests CRUD et triggers Site 1 / Scenario 1
+|   |-- site1_scenario2_tests.sql    Tests CRUD et triggers Site 1 / Scenario 2
+|   |-- site2_scenario1_tests.sql    Tests CRUD et triggers Site 2 / Scenario 1
+|   |-- site2_scenario2_tests.sql    Tests CRUD et triggers Site 2 / Scenario 2
+|   |-- central_routing_tests.sql    Demonstration du routage central Scenario 2
+|   |-- central_routing_sc1_tests.sql Demonstration du routage central Scenario 1
+|   |-- central_direct_table_routing_tests.sql Ancien test experimental du DML direct
+|   |-- distributed_queries.sql      Requetes distribuees et EXPLAIN PLAN
+|   |-- performance_analysis.sql     Analyse comparative avant/apres index
+|   |-- test_fix_doublon.sql         Verification de correction des doublons
+|   `-- test_redondance.sql          Verification de redondance des fragments
+|-- monitoring/
+|   |-- check_dblinks.sql            Controle SQL des DB links
+|   |-- monitor_logs.sql             Consultation des logs de routage/triggers
+|   `-- check_health.sh              Health check Docker, SQL et ressources
+|-- maintenance/
+|   |-- purge_logs.sql               Purge des logs anciens
+|   |-- rebuild_indexes.sql          Reconstruction des index
+|   `-- analyze_tables.sql           Collecte des statistiques DBMS_STATS
+|-- scripts/
+|   |-- start.sh                     Demarrage ordonne du cluster
+|   `-- connectivity_test.sh         Tests reseau, SQL*Plus et DB links
+`-- rapport/
+    |-- rapport_BDD_distribuees (1).docx Rapport du projet
+    `-- ppt.pdf                     Support de presentation
 ```
+
+Convention des fichiers :
+
+- Les fichiers `.sh` sont les scripts lances par l'image Docker Oracle pendant
+  l'initialisation des conteneurs.
+- Les fichiers `.sql` contiennent les sources SQL ou les scripts a executer
+  manuellement pour les tests, la maintenance et le monitoring.
 
 ## Connexion aux bases de données
 
